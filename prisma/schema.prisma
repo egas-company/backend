@@ -1,0 +1,331 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum UserRole {
+  CLIENT
+  DRIVER
+  ADMIN
+}
+
+enum OrderStatus {
+  PENDING
+  ASSIGNED
+  ACCEPTED
+  PICKED_UP
+  IN_TRANSIT
+  DELIVERED
+  CANCELLED
+}
+
+enum PaymentType {
+  CARD
+  CASH
+  ONLINE
+  BANK_TRANSFER
+  POS
+}
+
+enum NotificationPlatform {
+  ANDROID
+  IOS
+  WEB
+  UNKNOWN
+}
+
+enum NotificationApp {
+  USER
+  DRIVER
+  ADMIN
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  DELIVERED
+  FAILED
+  EXPIRED
+}
+
+enum DriverAssignmentAlarmStatus {
+  PENDING
+  ACKNOWLEDGED
+  CANCELLED
+}
+
+model User {
+  id              String    @id @default(cuid())
+  email           String?   @unique
+  password        String?
+  phoneNumber     String    @unique
+  phoneHash       String?
+  emailHash       String?
+  address         String?
+  tankSize        String?
+  role            UserRole  @default(CLIENT)
+  pushToken       String? // For push notifications
+  fcmToken        String? // For Firebase Cloud Messaging
+  deviceType      String? // mobile, tablet, web
+  appType         String? // user, driver
+  lastTokenUpdate DateTime?
+  verified        Boolean   @default(false)
+  firstName       String?
+  lastName        String?
+  area            String?
+  city            String?
+  street          String?
+  latitude        Float?
+  longitude       Float?
+  isBlocked       Boolean   @default(false)
+  isActive        Boolean   @default(true)
+  isDeleted       Boolean   @default(false) // Soft delete
+  deletedAt       DateTime?
+  termsAccepted   Boolean   @default(false)
+  onboarded       Boolean   @default(false)
+  lastLoginAt     DateTime?
+  totalOrders     Int       @default(0)
+  completedOrders Int       @default(0)
+  cancelledOrders Int       @default(0)
+  lastActive      DateTime  @default(now())
+  orders          Order[]   @relation("UserOrders")
+  driver          Driver?
+  notificationDevices NotificationDevice[]
+  notificationLogs NotificationLog[]
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  otps            Otp[]
+
+  @@index([email])
+  @@index([phoneNumber])
+  @@index([role])
+  @@index([isActive])
+  @@index([onboarded])
+  @@index([verified])
+  @@index([createdAt])
+}
+
+model Driver {
+  id                 String           @id @default(cuid())
+  userId             String           @unique
+  user               User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  isAvailable        Boolean          @default(true)
+  currentLat         Float?
+  currentLong        Float?
+  vehicleType        String?
+  vehiclePlate       String?
+  licenseNumber      String?
+  licenseExpiry      DateTime?
+  rating             Float?
+  totalTrips         Int              @default(0)
+  orders             Order[]
+  notificationDevices NotificationDevice[]
+  notificationLogs NotificationLog[]
+  assignmentAlarms   DriverAssignmentAlarm[]
+  documents          DriverDocument[]
+  lastLocationUpdate DateTime?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  @@index([isAvailable])
+  @@index([currentLat, currentLong])
+  @@index([vehicleType])
+  @@index([vehiclePlate])
+  @@index([licenseNumber])
+  @@index([rating])
+  @@index([totalTrips])
+  @@index([lastLocationUpdate])
+}
+
+model DriverDocument {
+  id         String    @id @default(cuid())
+  driver     Driver    @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  driverId   String
+  type       String // e.g., "NIN", "LICENSE", "VEHICLE_REGISTRATION"
+  url        String // document URL in storage
+  verified   Boolean   @default(false)
+  uploadedAt DateTime  @default(now())
+  verifiedAt DateTime?
+  verifiedBy String? // Admin who verified the document
+  expiryDate DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+}
+
+model DriverRating {
+  id        String   @id @default(cuid())
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId   String   @unique
+  rating    Int // 1-5 rating
+  comment   String?
+  createdAt DateTime @default(now())
+}
+
+model Order {
+  id                   String        @id @default(cuid())
+  trackingId           String        @unique @default(cuid())
+  orderId              String        @unique
+  user                 User          @relation("UserOrders", fields: [userId], references: [id])
+  userId               String
+  driver               Driver?       @relation(fields: [driverId], references: [id])
+  driverId             String?
+  tankSize             String
+  quantity             Int           @default(1)
+  deliveryAddress      String
+  deliveryLatitude     Float?
+  deliveryLongitude    Float?
+  paymentMethod        PaymentType
+  paymentStatus        String        @default("PENDING")
+  shippingFee          Float         @default(0)
+  paymentReference     String?
+  scheduledDate        DateTime?
+  actualDeliveryDate   DateTime?
+  status               OrderStatus   @default(PENDING)
+  notes                String?
+  amount               Float
+  totalAmount          Float
+  rating               DriverRating?
+  deliveryConfirmation Boolean?      @default(false)
+  assignedAt           DateTime? // Added to track order assignment
+  acceptedAt           DateTime? // Added to track order acceptance
+  pickedUpAt           DateTime? // Added to track pickup time
+  deliveredAt          DateTime? // Added to track delivery time
+  cancelledAt          DateTime? // Added to track cancellation
+  cancellationReason   String? // Added for cancellation reason
+  isDeleted            Boolean       @default(false) // Soft delete flag
+  deletedAt            DateTime?
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+  TankSize             TankSize?     @relation(fields: [tankSizeId], references: [id])
+  tankSizeId           String?
+  assignmentAlarm      DriverAssignmentAlarm?
+
+  @@index([trackingId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([driverId])
+  @@index([userId])
+  @@index([isDeleted])
+}
+
+model NotificationDevice {
+  id        String                @id @default(cuid())
+  userId    String?
+  driverId  String?
+  token     String                @unique
+  platform  NotificationPlatform  @default(UNKNOWN)
+  app       NotificationApp       @default(USER)
+  enabled   Boolean               @default(true)
+  lastSeenAt DateTime             @default(now())
+  createdAt DateTime              @default(now())
+  updatedAt DateTime              @updatedAt
+
+  user      User?                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  driver    Driver?               @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  logs      NotificationLog[]
+
+  @@index([userId])
+  @@index([driverId])
+  @@index([app])
+}
+
+model NotificationLog {
+  id         String             @id @default(cuid())
+  deviceId   String?
+  userId     String?
+  driverId   String?
+  type       String
+  status     NotificationStatus @default(PENDING)
+  response   String?
+  payload    Json?
+  errorCode  String?
+  createdAt  DateTime           @default(now())
+
+  device     NotificationDevice? @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  user       User?               @relation(fields: [userId], references: [id], onDelete: SetNull)
+  driver     Driver?             @relation(fields: [driverId], references: [id], onDelete: SetNull)
+
+  @@index([type])
+  @@index([status])
+  @@index([deviceId])
+}
+
+model DriverAssignmentAlarm {
+  id              String                       @id @default(cuid())
+  orderId         String                       @unique
+  driverId        String
+  status          DriverAssignmentAlarmStatus  @default(PENDING)
+  requestedAt     DateTime                     @default(now())
+  acknowledgedAt  DateTime?
+  resolvedAt      DateTime?
+  repeatJobKey    String?
+
+  order           Order                        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  driver          Driver                       @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@index([driverId])
+  @@index([status])
+}
+
+model UserDeletionAudit {
+  id         String   @id @default(cuid())
+  userId     String
+  phoneHash  String?
+  emailHash  String?
+  reason     String?
+  createdAt  DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+model PasswordReset {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  used      Boolean  @default(false)
+}
+
+model TankSize {
+  id        String   @id @default(cuid())
+  size      String   @unique
+  name      String   @unique
+  price     Float
+  status    String   @default("ACTIVE") // "ACTIVE", "INACTIVE"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  orders    Order[]
+}
+
+model Otp {
+  id           String   @id @default(cuid())
+  phoneNumber  String
+  code         String
+  attempts     Int      @default(0)
+  verified     Boolean  @default(false)
+  used         Boolean  @default(false)
+  requestIp    String?
+  requestAgent String?
+  createdAt    DateTime @default(now())
+  expiresAt    DateTime
+  userId       String?
+  user         User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model LoginAttempt {
+  id           String   @id @default(cuid())
+  phoneNumber  String
+  ipAddress    String?
+  userAgent    String?
+  success      Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  
+  @@index([phoneNumber, createdAt])
+  @@index([ipAddress, createdAt])
+}

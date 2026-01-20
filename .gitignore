@@ -1,0 +1,16 @@
+node_modules
+# Keep environment variables out of version control
+
+.env.local
+.env.development
+.env.production
+.env.test
+.admin-token.json
+
+# Firebase Service Account Credentials (NEVER COMMIT THESE!)
+*firebase-adminsdk*.json
+egasadmin*.json
+*-firebase-adminsdk-*.json
+
+dist
+/dist
