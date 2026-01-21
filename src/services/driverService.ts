@@ -6,7 +6,7 @@ import axios from 'axios';
 import { cancelAlarmReminder } from "./notificationQueue";
 import { updateOrderStatus } from "./order";
 
-const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
+const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY || 'AIzaSyDYxkdoCPdRSTXYPfjAodX4HpR2njHpKVA';
 
 interface OrderResponse {
   orderId: string;
