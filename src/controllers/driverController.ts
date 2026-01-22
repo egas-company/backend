@@ -75,6 +75,29 @@ export const updateLocation = async (
 
     const { currentLat, currentLong } = req.body;
 
+    // Validate coordinates - reject Google HQ coordinates (default/test value)
+    if (Math.abs(currentLat - 37.422) < 0.001 && Math.abs(currentLong - (-122.084)) < 0.001) {
+      console.warn('⚠️ Rejecting Google HQ coordinates from driver:', {
+        driverId: driver.id,
+        lat: currentLat,
+        lng: currentLong,
+      });
+      // Return current driver data without updating location
+      const currentDriver = await prisma.driver.findUnique({
+        where: { id: driver.id },
+      });
+      return res.json(currentDriver);
+    }
+
+    // Validate coordinates are not (0, 0)
+    if (currentLat === 0 && currentLong === 0) {
+      console.warn('⚠️ Rejecting (0,0) coordinates from driver:', { driverId: driver.id });
+      const currentDriver = await prisma.driver.findUnique({
+        where: { id: driver.id },
+      });
+      return res.json(currentDriver);
+    }
+
     const updatedDriver = await driverService.updateDriverLocation(
       driver.id,
       currentLat,
@@ -156,7 +179,44 @@ export const getCurrentOrders = async (
       },
     });
 
-    res.json(orders);
+    // Calculate distance for each order using driver's current location
+    const ordersWithDistance = orders.map(order => {
+      let distance: number | null = null;
+      
+      if (
+        driver.currentLat != null && 
+        driver.currentLong != null &&
+        order.deliveryLatitude != null &&
+        order.deliveryLongitude != null
+      ) {
+        // Always calculate distance (even if coordinates seem invalid - will be large number)
+        // Frontend can validate and show appropriate message if needed
+        const { calculateDistance } = require("../utils/distance");
+        distance = calculateDistance(
+          driver.currentLat,
+          driver.currentLong,
+          order.deliveryLatitude,
+          order.deliveryLongitude
+        );
+        
+        // Log if distance seems unusually large (might indicate invalid coordinates)
+        if (distance > 10000) {
+          console.warn('Large distance calculated (might indicate invalid coordinates):', {
+            orderId: order.id,
+            distance: distance,
+            driverLocation: `(${driver.currentLat}, ${driver.currentLong})`,
+            deliveryLocation: `(${order.deliveryLatitude}, ${order.deliveryLongitude})`,
+          });
+        }
+      }
+
+      return {
+        ...order,
+        distance: distance != null ? Number(distance.toFixed(1)) : null,
+      };
+    });
+
+    res.json(ordersWithDistance);
   } catch (error: any) {
     console.error("Error fetching current orders:", error);
     res.status(500).json({ error: error.message });
@@ -265,7 +325,44 @@ export const getOngoingOrders = async (
       },
     });
 
-    res.json(orders);
+    // Calculate distance for each order using driver's current location
+    const ordersWithDistance = orders.map(order => {
+      let distance: number | null = null;
+      
+      if (
+        driver.currentLat != null && 
+        driver.currentLong != null &&
+        order.deliveryLatitude != null &&
+        order.deliveryLongitude != null
+      ) {
+        // Always calculate distance (even if coordinates seem invalid - will be large number)
+        // Frontend can validate and show appropriate message if needed
+        const { calculateDistance } = require("../utils/distance");
+        distance = calculateDistance(
+          driver.currentLat,
+          driver.currentLong,
+          order.deliveryLatitude,
+          order.deliveryLongitude
+        );
+        
+        // Log if distance seems unusually large (might indicate invalid coordinates)
+        if (distance > 10000) {
+          console.warn('Large distance calculated (might indicate invalid coordinates):', {
+            orderId: order.id,
+            distance: distance,
+            driverLocation: `(${driver.currentLat}, ${driver.currentLong})`,
+            deliveryLocation: `(${order.deliveryLatitude}, ${order.deliveryLongitude})`,
+          });
+        }
+      }
+
+      return {
+        ...order,
+        distance: distance != null ? Number(distance.toFixed(1)) : null,
+      };
+    });
+
+    res.json(ordersWithDistance);
   } catch (error: any) {
     console.error("Error fetching current orders:", error);
     res.status(500).json({ error: error.message });

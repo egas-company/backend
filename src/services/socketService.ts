@@ -46,13 +46,26 @@ export const emitNewOrder = (driverId: string, order: any) => {
 
 export const emitDriverLocationUpdate = (update: DriverLocationUpdate) => {
   const io = getIO();
-  console.log(`Emitting driver location update for order ${update.orderId}:`, update);
-  io.to(`order_${update.orderId}`).emit("driverLocationUpdate", {
+  console.log(`📡 Emitting driver location update for order ${update.orderId}:`, {
+    orderId: update.orderId,
+    estimatedArrival: update.estimatedArrival,
+    timeRemaining: update.timeRemaining,
+    distanceText: update.distanceText,
+    durationText: update.durationText,
+    driverLocation: update.driverLocation,
+  });
+  
+  const payload = {
     orderId: update.orderId,
     driverLocation: update.driverLocation,
     estimatedArrival: update.estimatedArrival,
-    timeRemaining: update.timeRemaining
-  });
+    timeRemaining: update.timeRemaining,
+    distanceText: update.distanceText,
+    durationText: update.durationText,
+  };
+  
+  io.to(`order_${update.orderId}`).emit("driverLocationUpdate", payload);
+  console.log(`✅ driverLocationUpdate emitted to room: order_${update.orderId}`);
 };
 
 export const emitDriverReassignment = (

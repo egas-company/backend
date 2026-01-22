@@ -851,6 +851,9 @@ export const getOrderById = async (orderId: string, userId: string) => {
     throw new ApiError(404, "Order not found");
   }
 
+  // Return driver location even if invalid - client will handle validation and still try to calculate ETA
+  // This is COMPULSORY - client needs location to calculate ETA
+  // Client can decide whether to use it or not, but we provide it
   return { order, driverLocation };
 };
 

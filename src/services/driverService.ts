@@ -57,14 +57,117 @@ export const acceptOrder = async (
 
     await resolveAssignmentAlarm(orderId, DriverAssignmentAlarmStatus.ACKNOWLEDGED);
 
-    // Emit socket update
-    console.log('Emitting order accepted update:', {
+    // Calculate initial ETA when order is accepted
+    let initialETA: {
+      estimatedArrival: string;
+      timeRemaining: number;
+      distanceText: string;
+      durationText: string;
+    } | null = null;
+
+    if (
+      order.driver &&
+      order.driver.currentLat &&
+      order.driver.currentLong &&
+      order.deliveryLatitude &&
+      order.deliveryLongitude
+    ) {
+      const driverLat = order.driver.currentLat;
+      const driverLng = order.driver.currentLong;
+      const deliveryLat = order.deliveryLatitude;
+      const deliveryLng = order.deliveryLongitude;
+
+      // Check if location is invalid, but still try to calculate ETA (compulsory)
+      const isInvalidLocation = 
+        (driverLat === 0 && driverLng === 0) ||
+        (Math.abs(driverLat - 37.422) < 0.001 && Math.abs(driverLng - (-122.084)) < 0.001);
+
+      if (isInvalidLocation) {
+        console.warn('⚠️ Driver location is invalid (Google HQ or 0,0), but attempting ETA calculation anyway:', {
+          driverLat,
+          driverLng,
+          orderId: order.id,
+        });
+      }
+
+      // ALWAYS try to calculate ETA (compulsory requirement)
+      try {
+        const url = `https://maps.googleapis.com/maps/api/distancematrix/json?` +
+          `origins=${driverLat},${driverLng}&` +
+          `destinations=${deliveryLat},${deliveryLng}&` +
+          `departure_time=now&` +
+          `traffic_model=best_guess&` +
+          `key=${GOOGLE_MAPS_API_KEY}`;
+
+        console.log('🔄 Calculating initial ETA when order accepted (COMPULSORY):', {
+          orderId: order.id,
+          driverLocation: `(${driverLat}, ${driverLng})`,
+          deliveryLocation: `(${deliveryLat}, ${deliveryLng})`,
+          isInvalidLocation,
+        });
+
+        const response = await axios.get(url);
+        
+        if (response.data.status === 'OK') {
+          const element = response.data.rows[0].elements[0];
+          
+          if (element.status === 'OK') {
+            const { text: durationText } = element.duration;
+            const { text: distanceText } = element.distance;
+            
+            // Calculate arrival time
+            const now = new Date();
+            const arrivalTime = new Date(now.getTime() + element.duration.value * 1000);
+            const estimatedArrival = `${arrivalTime.getHours().toString().padStart(2, '0')}:${arrivalTime.getMinutes().toString().padStart(2, '0')}`;
+
+            initialETA = {
+              estimatedArrival,
+              timeRemaining: element.duration.value,
+              distanceText,
+              durationText
+            };
+
+            console.log('✅ Initial ETA calculated successfully:', initialETA);
+          } else {
+            console.warn('⚠️ Initial ETA calculation failed (element status):', {
+              status: element.status,
+              orderId: order.id,
+              driverLocation: `(${driverLat}, ${driverLng})`,
+            });
+          }
+        } else {
+          console.warn('⚠️ Distance Matrix API error for initial ETA:', {
+            status: response.data.status,
+            error_message: response.data.error_message,
+            orderId: order.id,
+          });
+        }
+      } catch (error) {
+        console.error('❌ Error calculating initial ETA:', {
+          error: error instanceof Error ? error.message : error,
+          orderId: order.id,
+          driverLocation: `(${driverLat}, ${driverLng})`,
+        });
+      }
+    } else {
+      console.warn('⚠️ Cannot calculate initial ETA - missing data:', {
+        orderId: order.id,
+        hasDriver: !!order.driver,
+        hasDriverLocation: !!(order.driver?.currentLat && order.driver?.currentLong),
+        hasDeliveryLocation: !!(order.deliveryLatitude && order.deliveryLongitude),
+      });
+    }
+
+    // Emit socket update with status and initial ETA immediately
+    console.log('📤 Emitting order accepted update:', {
       orderId: order.id,
       status: "ACCEPTED",
       driverLocation: order.driver ? {
         latitude: order.driver.currentLat,
         longitude: order.driver.currentLong,
       } : undefined,
+      hasInitialETA: !!initialETA,
+      willSendETA: !!initialETA,
     });
 
     emitOrderUpdate({
@@ -75,6 +178,23 @@ export const acceptOrder = async (
         longitude: order.driver.currentLong!,
       } : undefined,
     });
+
+    // Emit initial ETA immediately if calculated (send right after orderUpdate)
+    if (initialETA && order.driver) {
+      // Send ETA immediately - no delay needed
+      emitDriverLocationUpdate({
+        orderId: order.id,
+        driverLocation: {
+          latitude: order.driver.currentLat!,
+          longitude: order.driver.currentLong!,
+        },
+        estimatedArrival: initialETA.estimatedArrival,
+        timeRemaining: initialETA.timeRemaining,
+        distanceText: initialETA.distanceText,
+        durationText: initialETA.durationText,
+      });
+      console.log('Initial ETA sent immediately after order acceptance');
+    }
 
     return {
       orderId,
@@ -178,6 +298,27 @@ export const updateDriverLocation = async (
   currentLong: number
 ) => {
   try {
+    // Validate coordinates
+    if (!currentLat || !currentLong || isNaN(currentLat) || isNaN(currentLong)) {
+      console.error('Invalid driver location coordinates received:', { currentLat, currentLong, driverId });
+      throw new Error('Invalid driver location coordinates');
+    }
+
+    // Check for invalid coordinates (0,0)
+    if (currentLat === 0 && currentLong === 0) {
+      console.warn('Driver location is (0,0) - location may not be available:', { driverId });
+      // Don't throw, but log warning
+    }
+
+    // Check for Google HQ coordinates (common default/test value)
+    if (Math.abs(currentLat - 37.422) < 0.001 && Math.abs(currentLong - (-122.084)) < 0.001) {
+      console.warn('⚠️ Driver location appears to be Google HQ (default/test coordinates):', {
+        driverId,
+        lat: currentLat,
+        lng: currentLong,
+      });
+    }
+
     const driver = await prisma.driver.update({
       where: { id: driverId },
       data: { currentLat, currentLong },
@@ -195,6 +336,12 @@ export const updateDriverLocation = async (
 
     for (const order of driver.orders) {
       try {
+        // Validate order coordinates
+        if (!order.deliveryLatitude || !order.deliveryLongitude) {
+          console.warn('Order missing delivery coordinates:', { orderId: order.id });
+          continue;
+        }
+
         const url = `https://maps.googleapis.com/maps/api/distancematrix/json?` +
           `origins=${currentLat},${currentLong}&` +
           `destinations=${order.deliveryLatitude},${order.deliveryLongitude}&` +
@@ -202,11 +349,39 @@ export const updateDriverLocation = async (
           `traffic_model=best_guess&` +
           `key=${GOOGLE_MAPS_API_KEY}`;
 
+        console.log('Calculating ETA for order:', {
+          orderId: order.id,
+          driverLocation: `(${currentLat}, ${currentLong})`,
+          deliveryLocation: `(${order.deliveryLatitude}, ${order.deliveryLongitude})`,
+        });
+
         const response = await axios.get(url);
         console.log('Distance Matrix API response:', response.data);
+        
+        if (response.data.status !== 'OK') {
+          console.error('❌ Distance Matrix API error:', {
+            status: response.data.status,
+            error_message: response.data.error_message,
+            orderId: order.id,
+          });
+          // Still emit location update - client can calculate ETA (COMPULSORY)
+          emitDriverLocationUpdate({
+            orderId: order.id,
+            driverLocation: { 
+              latitude: currentLat, 
+              longitude: currentLong 
+            },
+            estimatedArrival: '',
+            timeRemaining: 0,
+            distanceText: '',
+            durationText: ''
+          });
+          continue;
+        }
+
         const element = response.data.rows[0].elements[0];
 
-        if (response.data.status === 'OK' && element.status === 'OK') {
+        if (element.status === 'OK') {
           // Use the formatted text directly from the API response
           const { text: durationText } = element.duration;
           const { text: distanceText } = element.distance;
@@ -215,6 +390,13 @@ export const updateDriverLocation = async (
           const now = new Date();
           const arrivalTime = new Date(now.getTime() + element.duration.value * 1000);
           const estimatedArrival = `${arrivalTime.getHours().toString().padStart(2, '0')}:${arrivalTime.getMinutes().toString().padStart(2, '0')}`;
+
+          console.log('✅ ETA calculated successfully:', {
+            orderId: order.id,
+            estimatedArrival,
+            timeRemaining: element.duration.value,
+            durationText,
+          });
 
           emitDriverLocationUpdate({
             orderId: order.id,
@@ -227,9 +409,44 @@ export const updateDriverLocation = async (
             distanceText,
             durationText
           });
+        } else {
+          console.warn('⚠️ Distance Matrix element status not OK:', {
+            status: element.status,
+            orderId: order.id,
+            driverLocation: `(${currentLat}, ${currentLong})`,
+            deliveryLocation: `(${order.deliveryLatitude}, ${order.deliveryLongitude})`,
+          });
+          // Still emit location update - client can calculate ETA (COMPULSORY)
+          emitDriverLocationUpdate({
+            orderId: order.id,
+            driverLocation: { 
+              latitude: currentLat, 
+              longitude: currentLong 
+            },
+            estimatedArrival: '',
+            timeRemaining: 0,
+            distanceText: '',
+            durationText: ''
+          });
         }
       } catch (error) {
-        console.error('Error getting distance matrix:', error);
+        console.error('❌ Error calculating ETA for order:', {
+          error: error instanceof Error ? error.message : error,
+          orderId: order.id,
+          driverLocation: `(${currentLat}, ${currentLong})`,
+        });
+        // Emit location update anyway - client can calculate ETA (COMPULSORY)
+        emitDriverLocationUpdate({
+          orderId: order.id,
+          driverLocation: { 
+            latitude: currentLat, 
+            longitude: currentLong 
+          },
+          estimatedArrival: '',
+          timeRemaining: 0,
+          distanceText: '',
+          durationText: ''
+        });
       }
     }
 
