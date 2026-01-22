@@ -8,3 +8,4 @@
 - Firebase: point `FIREBASE_SERVICE_ACCOUNT_PATH` or `FIREBASE_CREDENTIALS` to a Firebase Admin service-account JSON with messaging enabled.
 - Driver alarm cadence: override `DRIVER_ALARM_REPEAT_MS` (default 120000) to control how often persistent driver reminders are enqueued.
 - Worker process: start the queue processor locally with `npm run worker:dev`; production builds should run `npm run worker` (after `npm run build`) in a separate process alongside the API.
+https://7b827f689f4c.ngrok-free.app
