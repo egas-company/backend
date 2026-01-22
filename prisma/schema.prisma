@@ -93,6 +93,9 @@ model User {
   completedOrders Int       @default(0)
   cancelledOrders Int       @default(0)
   lastActive      DateTime  @default(now())
+  currentDeviceId String?
+  deviceId        String?
+  deviceIdUpdatedAt DateTime?
   orders          Order[]   @relation("UserOrders")
   driver          Driver?
   notificationDevices NotificationDevice[]
@@ -108,6 +111,7 @@ model User {
   @@index([onboarded])
   @@index([verified])
   @@index([createdAt])
+  @@index([deviceId])
 }
 
 model Driver {
@@ -191,6 +195,8 @@ model Order {
   totalAmount          Float
   rating               DriverRating?
   deliveryConfirmation Boolean?      @default(false)
+  deliveryPin          String?       // 6-character PIN for delivery confirmation
+  pinGeneratedAt       DateTime?     // Timestamp when PIN was generated
   assignedAt           DateTime? // Added to track order assignment
   acceptedAt           DateTime? // Added to track order acceptance
   pickedUpAt           DateTime? // Added to track pickup time
@@ -211,6 +217,7 @@ model Order {
   @@index([driverId])
   @@index([userId])
   @@index([isDeleted])
+  @@index([deliveryPin])
 }
 
 model NotificationDevice {

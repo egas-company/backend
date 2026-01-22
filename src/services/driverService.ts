@@ -552,7 +552,8 @@ export const startDelivery = async (
 
 export const completeDelivery = async (
   orderId: string,
-  driverId: string
+  driverId: string,
+  confirmationPin?: string
 ): Promise<OrderResponse> => {
   try {
     const order = await prisma.order.findFirst({
@@ -573,6 +574,15 @@ export const completeDelivery = async (
 
     if (!order) {
       throw new Error("Order not found or not in correct state");
+    }
+
+    // Verify delivery PIN
+    if (!confirmationPin) {
+      throw new Error("Confirmation PIN is required to complete delivery.");
+    }
+
+    if (order.deliveryPin !== confirmationPin.toUpperCase().trim()) {
+      throw new Error("Invalid confirmation PIN. Please verify the PIN with the customer.");
     }
 
     await updateOrderStatus(orderId, {

@@ -4,7 +4,7 @@ import { ApiError } from "../utils/ApiError";
 import { CreateOrderInput, UpdateOrderStatusInput } from "../types/order";
 import { logger } from "../utils/logger";
 import { emitNewOrder, emitOrderUpdate, emitDriverReassignment } from "./socketService";
-import { generateOrderId } from "../utils/orderUtils";
+import { generateOrderId, generateConfirmationPin } from "../utils/orderUtils";
 import { calculateDistance, findBestAvailableDriver } from "../utils/distance";
 import {
   enqueueDriverAssignmentNotification,
@@ -336,6 +336,7 @@ export const createOrder = async (orderData: CreateOrderInput) => {
     }
 
     const orderId = generateOrderId();
+    const deliveryPin = generateConfirmationPin();
 
     // Create the order first
     const order = await prisma.order.create({
@@ -353,6 +354,8 @@ export const createOrder = async (orderData: CreateOrderInput) => {
         status: "PENDING",
         paymentStatus: orderData.paymentStatus ?? "PENDING",
         paymentReference: orderData.paymentReference ?? null,
+        deliveryPin, // Generate unique PIN for this order
+        pinGeneratedAt: new Date(), // Track when PIN was generated
       },
       include: {
         driver: {

@@ -505,6 +505,7 @@ export const completeDelivery = async (
 ) => {
   try {
     const { orderId } = req.params;
+    const { confirmationPin } = req.body;
     const driver = await prisma.driver.findUnique({
       where: { userId: req.user!.id },
     });
@@ -514,7 +515,7 @@ export const completeDelivery = async (
       return;
     }
 
-    const result = await driverService.completeDelivery(orderId, driver.id);
+    const result = await driverService.completeDelivery(orderId, driver.id, confirmationPin);
     res.json(result);
   } catch (error: any) {
     console.error("Error completing delivery:", error);
