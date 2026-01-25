@@ -131,6 +131,6 @@ The scripts use `ON CONFLICT` clauses to handle duplicate data gracefully. If yo
 If you need to reset passwords:
 ```sql
 UPDATE "User" 
-SET password = '$2a$10$rQZ8K9mN2pL3vX7yJ1hG5tR6uI8oP9qW0eS1aB2cD3fE4gH5iJ6kL7mN8oP9' 
+SET password = '$2a$10$mRw/649rAGCTDLstrewCweIGvemy93vHjprd7WLQCRQvM2vv6Ux1G' 
 WHERE email LIKE 'driver%@example.com';
 ``` 
