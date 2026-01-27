@@ -20,11 +20,11 @@ ON CONFLICT (size) DO UPDATE SET
 
 -- Add Driver Users
 INSERT INTO "User" (id, email, "phoneNumber", password, "firstName", "lastName", role, verified, "isActive", "isDeleted", "createdAt", "updatedAt") VALUES
-('driver_1', 'driver1@example.com', '+2349044444444', '$2a$10$rQZ8K9mN2pL3vX7yJ1hG5tR6uI8oP9qW0eS1aB2cD3fE4gH5iJ6kL7mN8oP9', 'Michael', 'Okon', 'DRIVER', true, true, false, NOW(), NOW()),
-('driver_2', 'driver2@example.com', '+2349055555555', '$2a$10$rQZ8K9mN2pL3vX7yJ1hG5tR6uI8oP9qW0eS1aB2cD3fE4gH5iJ6kL7mN8oP9', 'David', 'Adebayo', 'DRIVER', true, true, false, NOW(), NOW()),
-('driver_3', 'driver3@example.com', '+2349066666666', '$2a$10$rQZ8K9mN2pL3vX7yJ1hG5tR6uI8oP9qW0eS1aB2cD3fE4gH5iJ6kL7mN8oP9', 'Emeka', 'Okechukwu', 'DRIVER', true, true, false, NOW(), NOW()),
-('driver_4', 'driver4@example.com', '+2349077777777', '$2a$10$rQZ8K9mN2pL3vX7yJ1hG5tR6uI8oP9qW0eS1aB2cD3fE4gH5iJ6kL7mN8oP9', 'Kemi', 'Adeleke', 'DRIVER', true, true, false, NOW(), NOW()),
-('driver_5', 'driver5@example.com', '+2349088888888', '$2a$10$rQZ8K9mN2pL3vX7yJ1hG5tR6uI8oP9qW0eS1aB2cD3fE4gH5iJ6kL7mN8oP9', 'Tunde', 'Bakare', 'DRIVER', true, true, false, NOW(), NOW())
+('driver_1', 'driver1@example.com', '+2349044444444', '$2a$10$mRw/649rAGCTDLstrewCweIGvemy93vHjprd7WLQCRQvM2vv6Ux1G', 'Michael', 'Okon', 'DRIVER', true, true, false, NOW(), NOW()),
+('driver_2', 'driver2@example.com', '+2349055555555', '$2a$10$mRw/649rAGCTDLstrewCweIGvemy93vHjprd7WLQCRQvM2vv6Ux1G', 'David', 'Adebayo', 'DRIVER', true, true, false, NOW(), NOW()),
+('driver_3', 'driver3@example.com', '+2349066666666', '$2a$10$mRw/649rAGCTDLstrewCweIGvemy93vHjprd7WLQCRQvM2vv6Ux1G', 'Emeka', 'Okechukwu', 'DRIVER', true, true, false, NOW(), NOW()),
+('driver_4', 'driver4@example.com', '+2349077777777', '$2a$10$mRw/649rAGCTDLstrewCweIGvemy93vHjprd7WLQCRQvM2vv6Ux1G', 'Kemi', 'Adeleke', 'DRIVER', true, true, false, NOW(), NOW()),
+('driver_5', 'driver5@example.com', '+2349088888888', '$2a$10$mRw/649rAGCTDLstrewCweIGvemy93vHjprd7WLQCRQvM2vv6Ux1G', 'Tunde', 'Bakare', 'DRIVER', true, true, false, NOW(), NOW())
 ON CONFLICT (email) DO UPDATE SET
   "firstName" = EXCLUDED."firstName",
   "lastName" = EXCLUDED."lastName",
@@ -82,12 +82,12 @@ ON CONFLICT (id) DO UPDATE SET
 
 -- Create a sample client user if it doesn't exist
 INSERT INTO "User" (id, email, "phoneNumber", password, "firstName", "lastName", role, verified, "isActive", "isDeleted", address, latitude, longitude, "createdAt", "updatedAt") VALUES
-('client_1', 'client1@example.com', '+2349022222222', '$2a$10$rQZ8K9mN2pL3vX7yJ1hG5tR6uI8oP9qW0eS1aB2cD3fE4gH5iJ6kL7mN8oP9', 'John', 'Doe', 'CLIENT', true, true, false, '123 Ikeja Street, Lagos', 6.6018, 3.3515, NOW(), NOW())
+('client_1', 'client1@example.com', '+2349022222222', '$2a$10$mRw/649rAGCTDLstrewCweIGvemy93vHjprd7WLQCRQvM2vv6Ux1G', 'John', 'Doe', 'CLIENT', true, true, false, '123 Ikeja Street, Lagos', 6.6018, 3.3515, NOW(), NOW())
 ON CONFLICT (email) DO NOTHING;
 
 -- Create a sample admin user if it doesn't exist
 INSERT INTO "User" (id, email, "phoneNumber", password, "firstName", "lastName", role, verified, "isActive", "isDeleted", "createdAt", "updatedAt") VALUES
-('admin_1', 'admin@example.com', '+2349011111111', '$2a$10$rQZ8K9mN2pL3vX7yJ1hG5tR6uI8oP9qW0eS1aB2cD3fE4gH5iJ6kL7mN8oP9', 'Admin', 'User', 'ADMIN', true, true, false, NOW(), NOW())
+('admin_1', 'admin@example.com', '+2349011111111', '$2a$10$mRw/649rAGCTDLstrewCweIGvemy93vHjprd7WLQCRQvM2vv6Ux1G', 'Admin', 'User', 'ADMIN', true, true, false, NOW(), NOW())
 ON CONFLICT (email) DO NOTHING;
 
 -- Insert Sample Orders
